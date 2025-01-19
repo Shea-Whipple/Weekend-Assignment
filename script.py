@@ -2,24 +2,63 @@ import os
 import re
 
 def parse_search_terms(search_input):
-    terms = search_input.split()
-    required = [term[1:] for term in terms if term.startswith('+')]
-    optional = [term for term in terms if not term.startswith('+')]
+    terms = []
+    i = 0
+    while i < len(search_input):
+        if search_input[i] == '+':
+            if search_input[i+1] == '(':
+                # Find closing parenthesis
+                end = search_input.find(')', i)
+                if end != -1:
+                    # Get terms within parentheses
+                    group_terms = search_input[i+2:end].split()
+                    terms.append(('+', group_terms))
+                    i = end + 1
+                else:
+                    i += 1
+            else:
+                # Regular required term
+                word_end = search_input.find(' ', i)
+                if word_end == -1:
+                    word_end = len(search_input)
+                terms.append(('+', [search_input[i+1:word_end]]))
+                i = word_end
+        else:
+            # Optional term
+            word_end = search_input.find(' ', i)
+            if word_end == -1:
+                word_end = len(search_input)
+            if i < word_end:
+                terms.append(('?', [search_input[i:word_end]]))
+            i = word_end
+        i += 1
+        
+    required = []
+    optional = []
+    for type, words in terms:
+        if type == '+':
+            required.append(words)
+        else:
+            optional.extend(words)
     return required, optional
 
 def create_search_pattern(required, optional):
     pattern_parts = []
     
-    # Required terms - all must match using positive lookahead
-    if required:
-        pattern_parts.extend(f'(?=.*{term})' for term in required)
+    # Required terms - each group must match
+    for req_group in required:
+        if len(req_group) > 1:
+            # Multiple terms in group - any must match
+            pattern_parts.append(f'(?=.*(?:{"|".join(req_group)}))')
+        else:
+            # Single required term
+            pattern_parts.append(f'(?=.*{req_group[0]})')
     
     # Optional terms - may or may not match
     if optional:
         opt_pattern = '|'.join(optional)
         pattern_parts.append(f'(?:.*(?:{opt_pattern}))??')
     
-    # If no patterns, match anything
     return ''.join(pattern_parts) if pattern_parts else '.*'
 
 def search_in_files(search_input):
@@ -53,6 +92,6 @@ def display_results(results):
         print("-" * 50)
 
 if __name__ == "__main__":
-    search_input = input("Enter search terms (+ for required): ")
+    search_input = input("Enter search terms (use + for required, +(term1 term2) for either/or): ")
     results = search_in_files(search_input)
     display_results(results)
