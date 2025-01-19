@@ -1,3 +1,2 @@
 # Weekend-Assignment
-Search Query 
-# Weekend-Assignment
+Search Query
